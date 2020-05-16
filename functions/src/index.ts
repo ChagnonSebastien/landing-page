@@ -1,5 +1,8 @@
 import * as functions from 'firebase-functions';
+import blogMessagesExpress from './blogMessages';
 
-export const helloWorld = functions.https.onRequest((request, response) => {
-  response.send("Hello from Firebase!");
+export const blogMessages = functions.https.onRequest(blogMessagesExpress);
+
+export const version = functions.https.onRequest((_, response) => {
+  response.send("0.1");
 });
