@@ -1,7 +1,10 @@
 import axios, { AxiosResponse } from "axios";
 import { firestore } from 'firebase-admin';
+import { Client, ElevationResponse } from "@googlemaps/google-maps-services-js";
+import { config } from 'firebase-functions';
 
 export default async () => {
+  const client = new Client({});
   const FirestoreInstance = firestore();
   const feedID = '0cabP8hB9XxqSSJ9QGNd160ahvZoVCeD3';
   let offset = 0;
@@ -15,19 +18,30 @@ export default async () => {
 
     while (messages.length > 0) {
       const message = messages.shift();
+
+      const query = await FirestoreInstance.collection('locationHistory').where('timestamp', '==', firestore.Timestamp.fromMillis(message.unixTime * 1000)).limit(1).get();
+      if(!query.empty) {
+        console.log('Found duplicate entry. Stopping.');
+        return;
+      }
+
+      const elevationResponse: ElevationResponse = await client.elevation({
+        params: {
+          locations: [{ lat: message.latitude, lng: message.longitude }],
+          key: config().maps.key,
+        },
+        timeout: 1000,
+      });
+      
       const formatedMessage: any = {
         timestamp: firestore.Timestamp.fromMillis(message.unixTime * 1000),
         location: new firestore.GeoPoint(message.latitude, message.longitude),
         messageType: message.messageType,
         messageContent: message.messageContent,
         batteryState: message.batteryState,
+        elevation: elevationResponse.data.results[0].elevation,
       }
       Object.keys(formatedMessage).forEach(key => formatedMessage[key] === undefined && delete formatedMessage[key]);
-      const query = await FirestoreInstance.collection('locationHistory').where('timestamp', '==', formatedMessage.timestamp).limit(1).get();
-      if(!query.empty) {
-        console.log('Found duplicate entry. Stopping.');
-        return;
-      }
 
       FirestoreInstance.collection('locationHistory').doc().create(formatedMessage)
         .then((value: firestore.WriteResult) => {
