@@ -31,12 +31,10 @@ app.get('/expeditions', (_, res) => {
       }
 
       res.send(expeditionsQuery.docs.map((docSnapshot) => {
-        const { from, to, ...otherData } = docSnapshot.data();
+        const { ...otherData } = docSnapshot.data();
         return {
           id: docSnapshot.id,
           ...otherData,
-          from: from.toMillis(),
-          to: to.toMillis(),
         }
       }));
     })
@@ -50,12 +48,21 @@ app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
         res.status(404).send('Expedition does not exist.');
         return;
       }
+      const expedition = expeditionSnapshot.data();
 
       let query = firestore.collection('locationHistory').orderBy('timestamp', 'asc');
       if (req.query.date) {
-        const from = new Date(Date.parse(req.query.date));
+        const from = new Date(`${req.query.date}T00:00:00.000${expedition.timezone}`);
         if (!(from instanceof Date && !isNaN(from))) {
           res.status(400).send('Invalid date format. The ISO format is required.');
+          return;
+        }
+
+        const expeditionFrom = new Date(`${expedition.from}T00:00:00.000${expedition.timezone}`);
+        const expeditionTo = new Date(`${expedition.to}T23:59:59.999${expedition.timezone}`);
+
+        if (expeditionFrom.getTime() > from.getTime() || expeditionTo.getTime() < from.getTime()) {
+          res.status(404).send('The expedition was not active at the required date');
           return;
         }
 
@@ -66,8 +73,8 @@ app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
           .where('timestamp', '<', Timestamp.fromDate(to));
       } else {
         query = query
-          .where('timestamp', '>', expeditionSnapshot.data().from)
-          .where('timestamp', '<', expeditionSnapshot.data().to)
+          .where('timestamp', '>', Timestamp.fromDate(expeditionFrom))
+          .where('timestamp', '<', Timestamp.fromDate(expeditionTo))
           .where('messageType', '==', 'OK');
       }
 
