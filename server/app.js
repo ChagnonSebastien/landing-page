@@ -1,11 +1,13 @@
 const express = require('express');
-
+const cors = require('cors');
 const app = express();
 
 const { Firestore, Timestamp } = require('@google-cloud/firestore');
 
 // Instantiate a datastore client
 const firestore = new Firestore();
+
+app.use(cors());
 
 app.get('/version', (_, res) => res.send('v1.0.0'));
 
@@ -104,7 +106,7 @@ app.get('/expeditions/:expeditionId/locationHistory/latest', (req, res) => {
         res.status(404).send('Expedition does not exist.');
         return;
       }
-      
+
       const expedition = expeditionSnapshot.data();
       const expeditionFrom = new Date(`${expedition.from}T00:00:00.000${expedition.timezone}`);
       const expeditionTo = new Date(`${expedition.to}T23:59:59.999${expedition.timezone}`);
