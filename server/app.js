@@ -22,6 +22,27 @@ app.get('/spot/batteryState', (_, res) => {
     .catch((reason) => res.status(500).send(reason));
 });
 
+app.get('/expeditions', (_, res) => {
+  firestore.collection('expeditions').get()
+    .then((expeditionsQuery) => {
+      if (expeditionsQuery.empty) {
+        res.status(204).send([]);
+        return;
+      }
+
+      res.send(expeditionsQuery.docs.map((docSnapshot) => {
+        const { from, to, ...otherData } = docSnapshot.data();
+        return {
+          id: docSnapshot.id,
+          ...otherData,
+          from: from.toMillis(),
+          to: to.toMillis(),
+        }
+      }));
+    })
+    .catch((reason) => res.status(500).send(reason));
+});
+
 app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
   firestore.collection('expeditions').doc(req.params.expeditionId).get()
     .then(async (expeditionSnapshot) => {
