@@ -1,38 +1,31 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { BrowserRouter as Router, Switch, Route, Redirect, Link } from 'react-router-dom';
 
-import { Container, Row, Col, Card, Button, Spinner } from 'react-bootstrap';
-import server from './server';
-import Expedition from './Expedition';
+import { Container } from 'react-bootstrap';
+import ExpeditionsList from './Expeditions';
+import ExpeditionDetails from './Expeditions/Details';
 
-const App = ()  => {
-  const [expeditions, setExpeditions] = useState<Expedition[]>();
-
-  useEffect(() => {
-    server.get('/expeditions')
-      .then((response) => setExpeditions(response.data))
-      .catch((error) => console.error(error));
-  }, []);
-
-  let expeditionCards = expeditions?.map((expedition) => (
-    <Col xl="6">
-      <Card>
-        <Card.Img variant="top" src={expedition.image} />
-        <Card.Body>
-          <Card.Title>{expedition.name}</Card.Title>
-          <Card.Text>{expedition.description}</Card.Text>
-          <Button variant="primary">Details</Button>
-        </Card.Body>
-      </Card>
-    </Col>
-  )) ?? <Spinner animation="border" />;
-
-  return (
+const App = ()  => (
+  <Router>
     <Container>
-      <Row>
-        {expeditionCards}
-      </Row>
+      <Switch>
+        <Route exact path="/">
+          <Redirect to="/expeditions" />
+        </Route>
+        <Route exact path="/expeditions">
+          <ExpeditionsList />
+        </Route>
+        <Route path="/expeditions/:expeditionId">
+          <ExpeditionDetails />
+        </Route>
+        <Route>
+          <h2>How dod you get here?</h2>
+          <p>This page doesn't seem to exist</p>
+          <Link to="/">Return to Home</Link>
+        </Route>
+      </Switch>
     </Container>
-  );
-}
+  </Router>
+);
 
 export default App;
