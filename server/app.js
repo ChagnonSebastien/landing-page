@@ -97,6 +97,40 @@ app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
     .catch((reason) => res.status(500).send(reason));
 });
 
+app.get('/expeditions/:expeditionId/locationHistory/latest', (req, res) => {
+  firestore.collection('expeditions').doc(req.params.expeditionId).get()
+    .then(async (expeditionSnapshot) => {
+      if (!expeditionSnapshot.exists) {
+        res.status(404).send('Expedition does not exist.');
+        return;
+      }
+      
+      const expedition = expeditionSnapshot.data();
+      const expeditionFrom = new Date(`${expedition.from}T00:00:00.000${expedition.timezone}`);
+      const expeditionTo = new Date(`${expedition.to}T23:59:59.999${expedition.timezone}`);
+
+      let query = firestore.collection('locationHistory')
+        .orderBy('timestamp', 'desc').limit(1)
+        .where('timestamp', '>', Timestamp.fromDate(expeditionFrom))
+        .where('timestamp', '<', Timestamp.fromDate(expeditionTo))
+
+      const locationQuery = await query.get();
+      if (locationQuery.empty) {
+        res.status(404).send('No location has ever been recorded for this expedition.');
+        return;
+      }
+
+      const { timestamp, location, ...otherData } = locationQuery.docs[0].data();
+      res.send({
+        ...otherData,
+        location: { latitude: location.latitude, longitude: location.longitude },
+        timestamp: timestamp.toMillis(),
+      });
+
+    })
+    .catch((reason) => res.status(500).send(reason));
+});
+
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`App listening on port ${PORT}`);
