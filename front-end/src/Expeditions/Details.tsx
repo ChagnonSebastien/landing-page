@@ -1,7 +1,7 @@
 import React, { useState, useEffect, memo } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 
-import { Row, Col } from 'react-bootstrap';
+import { Row, Col, Button } from 'react-bootstrap';
 import { withRouter } from 'react-router-dom';
 import { Scatter } from 'react-chartjs-2';
 
@@ -10,29 +10,6 @@ import SpotPing, { distanceBetweenGeoPoints } from './SpotPing';
 import server from '../server';
 import axios from 'axios';
 import Vector2D from './Vector2D';
-
-const scaleToDistanceRatios = [
-  { zoom: 20, size: 1128.497220 },
-  { zoom: 19, size: 2256.994440 },
-  { zoom: 18, size: 4513.988880 },
-  { zoom: 17, size: 9027.977761 },
-  { zoom: 16, size: 18055.955520 },
-  { zoom: 15, size: 36111.911040 },
-  { zoom: 14, size: 72223.822090 },
-  { zoom: 13, size: 144447.644200 },
-  { zoom: 12, size: 288895.288400 },
-  { zoom: 11, size: 577790.576700 },
-  { zoom: 10, size: 1155581.153000 },
-  { zoom: 9 , size: 2311162.307000 },
-  { zoom: 8 , size: 4622324.614000 },
-  { zoom: 7 , size: 9244649.227000 },
-  { zoom: 6 , size: 18489298.450000 },
-  { zoom: 5 , size: 36978596.910000 },
-  { zoom: 4 , size: 73957193.820000 },
-  { zoom: 3 , size: 147914387.600000 },
-  { zoom: 2 , size: 295828775.300000 },
-  { zoom: 1 , size: 591657550.500000 }
-]
 
 const calculateHeightProfile = (locationHistory: SpotPing[]): Vector2D[] => {
   if (locationHistory.length === 0) {
@@ -65,16 +42,35 @@ const ExpeditionDetails = withRouter((props: Props)  => {
   const [expedition, setExpedition] = useState<Expedition>();
   const [latestLocation, setLatestLocation] = useState<SpotPing>();
 
+  const [dateFilter, setDateFilter] = useState<Date>();
   const [locationHistory, setLocationHistory] = useState<SpotPing[]>();
   const [heightProfile, setHeightProfile] = useState<Vector2D[]>();
 
-  
+  const [map, setMap] = useState<google.maps.Map>();
+
+  useEffect(() => {
+    if (!window.google) return;
+    const bounds: google.maps.LatLngBounds = new google.maps.LatLngBounds();
+    locationHistory?.forEach((point) => bounds.extend(new google.maps.LatLng(point.location.latitude, point.location.longitude)));
+    map?.fitBounds(bounds);
+  }, [map, locationHistory]);
+
+  useEffect(() => {
+    if (!dateFilter) return;
+    const date = `${dateFilter?.getFullYear()}-${String(dateFilter?.getMonth() + 1).padStart(2, '0')}-${String(dateFilter?.getDate()).padStart(2, '0')}`
+    server.get(`/expeditions/${expeditionId}/locationHistory?date=${date}`)
+      .then((response) => {
+        setLocationHistory(response.data);
+        setHeightProfile(calculateHeightProfile(response.data));
+      })
+      .catch((error) => console.error(error));
+  }, [dateFilter, expeditionId]);
 
   useEffect(() => {
     axios.all([
       server.get(`/expeditions/${expeditionId}`),
       server.get(`/expeditions/${expeditionId}/locationHistory/latest`),
-      server.get(`/expeditions/${expeditionId}/locationHistory?date=2020-07-16`),
+      server.get(`/expeditions/${expeditionId}/locationHistory`),
     ])
       .then(axios.spread((
         expeditionResponse,
@@ -98,65 +94,92 @@ const ExpeditionDetails = withRouter((props: Props)  => {
           <LoadScript
             googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
           >
-            {locationHistory
-              ? (
-                <GoogleMap
-                  mapContainerStyle={{
-                    width: '100%',
-                    height: '35rem'
-                  }}
-                  onLoad={map => {
-                    const windowRef: any = window;
-                    const bounds = new windowRef.google.maps.LatLngBounds();
-                    locationHistory?.forEach((point) => bounds.extend(new windowRef.google.maps.LatLng(point.location.latitude, point.location.longitude)));
-                    map.fitBounds(bounds);
-                  }}
-                >
-                  {locationHistory?.map((point: SpotPing) => (
-                    <Marker
-                      key={point.timestamp}
-                      position={{lat: point.location.latitude, lng: point.location.longitude}}
-                    />
-                  ))}
-                </GoogleMap>
-              ) : null}
+            <GoogleMap
+              mapContainerStyle={{ width: '100%', height: '35rem' }}
+              onLoad={(map: google.maps.Map) =>  setMap(map)}
+            >
+              {locationHistory?.map((point: SpotPing, index: number) => (
+                <Marker
+                  key={point.timestamp}
+                  position={{lat: point.location.latitude, lng: point.location.longitude}}
+                  icon={index === locationHistory.length - 1 ? 'http://icongal.com/gallery/download/447373/32/png' : 'http://icongal.com/gallery/download/446879/24/png'}
+                />
+              ))}
+            </GoogleMap>
           </LoadScript>
         </Col>
       </Row>
-      <Row>
-        <Col>
-          <Scatter
-            data={{
-              datasets: [{
-                data: heightProfile,
-                showLine: true,
-                lineTension: 0.2,
-              }]
-            }}
-            options={{
-              legend: {
-                display: false
-              },
-              scales: {
-                xAxes: [{
-                  position: 'bottom',
-                  scaleLabel: {
-                    display: true,
-                    labelString: 'Distance Traveled (km)'
-                  }
-                }],
-                yAxes: [{
-                  position: 'bottom',
-                  scaleLabel: {
-                    display: true,
-                    labelString: 'Height (m)'
-                  }
-                }]
-              }
-            }}
-          />
+      <Row className="justify-content-center">
+        <Col xs="auto">
+          {dateFilter
+            ? (
+              <>
+                <Button
+                  size="lg"
+                  variant="outline-dark"
+                  onClick={() => {
+                    const newDate = new Date(dateFilter);
+                    newDate.setDate(dateFilter.getDate() - 1);
+                    setDateFilter(newDate);
+                  }}
+                >
+                  «
+                </Button>
+                <span className="mx-4 align-middle" style={{ fontSize: '1.5rem' }}>{dateFilter.toDateString()}</span>
+                <Button
+                  size="lg"
+                  variant="outline-dark"
+                  onClick={() => {
+                    const newDate = new Date(dateFilter);
+                    newDate.setDate(dateFilter.getDate() + 1);
+                    setDateFilter(newDate);
+                  }}
+                >
+                  »
+                </Button>
+              </>
+            ) : (
+              <Button onClick={() => setDateFilter(new Date(latestLocation?.timestamp ?? new Date()))}>Jump to today</Button>
+            )}
         </Col>
       </Row>
+      {dateFilter
+        ? (
+          <Row>
+            <Col>
+              <Scatter
+                data={{
+                  datasets: [{
+                    data: heightProfile,
+                    showLine: true,
+                    lineTension: 0.2,
+                  }]
+                }}
+                options={{
+                  legend: {
+                    display: false
+                  },
+                  scales: {
+                    xAxes: [{
+                      position: 'bottom',
+                      scaleLabel: {
+                        display: true,
+                        labelString: 'Distance Traveled (km)'
+                      }
+                    }],
+                    yAxes: [{
+                      position: 'bottom',
+                      scaleLabel: {
+                        display: true,
+                        labelString: 'Height (m)'
+                      }
+                    }]
+                  }
+                }}
+              />
+            </Col>
+          </Row>
+        ) : null}
     </>
   );
 });
