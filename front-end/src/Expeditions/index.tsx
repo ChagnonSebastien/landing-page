@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
+import { MDBRow, MDBCol, MDBCard, MDBBtn, MDBCardImage, MDBCardBody, MDBCardTitle, MDBCardText, MDBSpinner } from 'mdbreact';
 
-import { Row, Col, Card, Button, Spinner } from 'react-bootstrap';
 import server from '../server';
 import Expedition from './Expedition';
 import { withRouter } from 'react-router-dom';
@@ -24,22 +24,22 @@ const ExpeditionList = withRouter((props: Props)  => {
   }, []);
 
   let expeditionCards = expeditions?.map((expedition) => (
-    <Col xl="6">
-      <Card>
-        <Card.Img variant="top" src={expedition.image} />
-        <Card.Body>
-          <Card.Title>{expedition.name}</Card.Title>
-          <Card.Text>{expedition.description}</Card.Text>
-          <Button onClick={() => push(`/expeditions/${expedition.id}`)}>Details</Button>
-        </Card.Body>
-      </Card>
-    </Col>
-  )) ?? <Spinner animation="border" />;
+    <MDBCol xl="6">
+      <MDBCard>
+        <MDBCardImage variant="top" src={expedition.image} />
+        <MDBCardBody>
+          <MDBCardTitle>{expedition.name}</MDBCardTitle>
+          <MDBCardText>{expedition.description}</MDBCardText>
+          <MDBBtn onClick={() => push(`/expeditions/${expedition.id}`)}>Details</MDBBtn>
+        </MDBCardBody>
+      </MDBCard>
+    </MDBCol>
+  )) ?? <MDBSpinner animation="border" />;
 
   return (
-    <Row className="justify-content-center">
+    <MDBRow className="justify-content-center">
       {expeditionCards}
-    </Row>
+    </MDBRow>
   );
 });
 

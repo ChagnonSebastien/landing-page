@@ -1,7 +1,7 @@
 import React, { useState, useEffect, memo } from 'react';
 import { GoogleMap, LoadScript, Marker } from '@react-google-maps/api';
 
-import { Row, Col, Button } from 'react-bootstrap';
+import { MDBRow, MDBCol, MDBBtn } from 'mdbreact';
 import { withRouter } from 'react-router-dom';
 import { Scatter } from 'react-chartjs-2';
 
@@ -89,8 +89,8 @@ const ExpeditionDetails = withRouter((props: Props)  => {
   return (
     <>
       <h1>{expedition?.name}</h1>
-      <Row>
-        <Col>
+      <MDBRow>
+        <MDBCol>
           <LoadScript
             googleMapsApiKey={process.env.REACT_APP_GOOGLE_MAPS_KEY}
           >
@@ -107,14 +107,14 @@ const ExpeditionDetails = withRouter((props: Props)  => {
               ))}
             </GoogleMap>
           </LoadScript>
-        </Col>
-      </Row>
-      <Row className="justify-content-center">
-        <Col xs="auto">
+        </MDBCol>
+      </MDBRow>
+      <MDBRow>
+        <MDBCol style={{ textAlign: 'center' }}>
           {dateFilter
             ? (
               <>
-                <Button
+                <MDBBtn
                   size="lg"
                   variant="outline-dark"
                   onClick={() => {
@@ -124,9 +124,9 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                   }}
                 >
                   «
-                </Button>
+                </MDBBtn>
                 <span className="mx-4 align-middle" style={{ fontSize: '1.5rem' }}>{dateFilter.toDateString()}</span>
-                <Button
+                <MDBBtn
                   size="lg"
                   variant="outline-dark"
                   onClick={() => {
@@ -136,17 +136,17 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                   }}
                 >
                   »
-                </Button>
+                </MDBBtn>
               </>
             ) : (
-              <Button onClick={() => setDateFilter(new Date(latestLocation?.timestamp ?? new Date()))}>Jump to today</Button>
+              <MDBBtn onClick={() => setDateFilter(new Date(latestLocation?.timestamp ?? new Date()))}>Jump to today</MDBBtn>
             )}
-        </Col>
-      </Row>
+        </MDBCol>
+      </MDBRow>
       {dateFilter
         ? (
-          <Row>
-            <Col>
+          <MDBRow>
+            <MDBCol>
               <Scatter
                 data={{
                   datasets: [{
@@ -177,8 +177,8 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                   }
                 }}
               />
-            </Col>
-          </Row>
+            </MDBCol>
+          </MDBRow>
         ) : null}
     </>
   );

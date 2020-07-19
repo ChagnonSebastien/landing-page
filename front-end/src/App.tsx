@@ -1,13 +1,13 @@
 import React from 'react';
 import { BrowserRouter as Router, Switch, Route, Redirect, Link } from 'react-router-dom';
 
-import { Container } from 'react-bootstrap';
 import ExpeditionsList from './Expeditions';
 import ExpeditionDetails from './Expeditions/Details';
+import { MDBContainer } from 'mdbreact';
 
 const App = ()  => (
   <Router>
-    <Container>
+    <MDBContainer>
       <Switch>
         <Route exact path="/">
           <Redirect to="/expeditions" />
@@ -24,7 +24,7 @@ const App = ()  => (
           <Link to="/">Return to Home</Link>
         </Route>
       </Switch>
-    </Container>
+    </MDBContainer>
   </Router>
 );
 
