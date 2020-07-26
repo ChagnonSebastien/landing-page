@@ -24,9 +24,9 @@ const ExpeditionList = withRouter((props: Props)  => {
   }, []);
 
   let expeditionCards = expeditions?.map((expedition) => (
-    <MDBCol xl="6">
+    <MDBCol lg="6" key={expedition.id}>
       <MDBCard>
-        <MDBCardImage variant="top" src={expedition.image} />
+        <MDBCardImage className="img-fluid" variant="top" src={expedition.image} />
         <MDBCardBody>
           <MDBCardTitle>{expedition.name}</MDBCardTitle>
           <MDBCardText>{expedition.description}</MDBCardText>
