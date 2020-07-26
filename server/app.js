@@ -63,27 +63,38 @@ app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
         res.status(404).send('Expedition does not exist.');
         return;
       }
+
       const expedition = expeditionSnapshot.data();
-      const expeditionFrom = new Date(`${expedition.from}T00:00:00.000${expedition.timezone}`);
-      const expeditionTo = new Date(`${expedition.to}T23:59:59.999${expedition.timezone}`);
+      const { findTimeZone, getUnixTime } = require('timezone-support');
+      const timezone = findTimeZone(expedition.timezone);
+
+      const fromSplit = expedition.from.split('-');
+      const fromData = { year: Number(fromSplit[0]), month: Number(fromSplit[1]), day: Number(fromSplit[2]), hours: 0, minutes: 0 };
+      const expeditionFrom = new Date(getUnixTime(fromData, timezone))
+
+      const toSplit = expedition.to.split('-');
+      const toData = { year: Number(toSplit[0]), month: Number(toSplit[1]), day: Number(toSplit[2]), hours: 23, minutes: 59 };
+      const expeditionTo = new Date(getUnixTime(toData, timezone))
 
       let query = firestore.collection('locationHistory').orderBy('timestamp', 'asc');
       if (req.query.date) {
-        const from = new Date(`${req.query.date}T00:00:00.000${expedition.timezone}`);
-        if (!(from instanceof Date && !isNaN(from))) {
+        const reqSplit = req.query.date.split('-');
+        const reqData = { year: Number(reqSplit[0]), month: Number(reqSplit[1]), day: Number(reqSplit[2]), hours: 0, minutes: 0 };
+        const reqDate = new Date(getUnixTime(reqData, timezone));
+        if (!(reqDate instanceof Date && !isNaN(reqDate))) {
           res.status(400).send('Invalid date format. The ISO format is required.');
           return;
         }
 
-        if (expeditionFrom.getTime() > from.getTime() || expeditionTo.getTime() < from.getTime()) {
+        if (expeditionFrom.getTime() > reqDate.getTime() || expeditionTo.getTime() < reqDate.getTime()) {
           res.status(404).send('The expedition was not active at the required date');
           return;
         }
 
-        const to = new Date(from)
-        to.setDate(from.getDate() + 1);
+        const to = new Date(reqDate)
+        to.setDate(reqDate.getDate() + 1);
         query = query
-          .where('timestamp', '>', Timestamp.fromDate(from))
+          .where('timestamp', '>', Timestamp.fromDate(reqDate))
           .where('timestamp', '<', Timestamp.fromDate(to));
       } else {
         query = query
@@ -108,7 +119,10 @@ app.get('/expeditions/:expeditionId/locationHistory', (req, res) => {
       }));
 
     })
-    .catch((reason) => res.status(500).send(reason));
+    .catch((reason) => {
+      console.error(reason);
+      res.status(500).send(reason);
+    });
 });
 
 app.get('/expeditions/:expeditionId/locationHistory/latest', (req, res) => {
@@ -120,8 +134,16 @@ app.get('/expeditions/:expeditionId/locationHistory/latest', (req, res) => {
       }
 
       const expedition = expeditionSnapshot.data();
-      const expeditionFrom = new Date(`${expedition.from}T00:00:00.000${expedition.timezone}`);
-      const expeditionTo = new Date(`${expedition.to}T23:59:59.999${expedition.timezone}`);
+      const { findTimeZone, getUnixTime } = require('timezone-support');
+      const timezone = findTimeZone(expedition.timezone);
+
+      const fromSplit = expedition.from.split('-');
+      const fromData = { year: Number(fromSplit[0]), month: Number(fromSplit[1]), day: Number(fromSplit[2]), hours: 0, minutes: 0 };
+      const expeditionFrom = new Date(getUnixTime(fromData, timezone))
+
+      const toSplit = expedition.to.split('-');
+      const toData = { year: Number(toSplit[0]), month: Number(toSplit[1]), day: Number(toSplit[2]), hours: 23, minutes: 59 };
+      const expeditionTo = new Date(getUnixTime(toData, timezone))
 
       let query = firestore.collection('locationHistory')
         .orderBy('timestamp', 'desc').limit(1)
