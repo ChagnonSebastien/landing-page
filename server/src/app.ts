@@ -1,9 +1,8 @@
 import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
-import { locationHistoryConverter } from './LocationHistory';
-import FirestoreProvider from './FirestoreProvider';
 
 import expeditionsRoute from './routes/expedition';
+import * as spotService from './services/spot';
 
 const app = express();
 
@@ -17,18 +16,13 @@ app.get('/version', (_, res) => res.send('v1.0.0'));
 
 app.get('/spot/batteryState', async (_, res) => {
   try {
-    const { firestore } = FirestoreProvider.get();
-    const locationQuery = firestore.collection('locationHistory')
-      .withConverter(locationHistoryConverter)
-      .orderBy('timestamp')
-      .limit(1);
-    const locationSnapshot = await locationQuery.get();
+    const batteryState = await spotService.getAllPoints();
 
-    if (locationSnapshot.empty) {
+    if (batteryState === undefined) {
       return res.status(404).send('No battery state has ever been recorded.');
     }
 
-    return res.send(locationSnapshot.docs[0].data().batteryState);
+    return res.send(batteryState);
   } catch (error) {
     console.error(error);
     return res.status(500).send(error);

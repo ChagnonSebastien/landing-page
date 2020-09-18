@@ -1,5 +1,7 @@
 import { DocumentData, QueryDocumentSnapshot } from '@google-cloud/firestore';
 
+import convertISOToDate from '../utils';
+
 export class Expedition {
   constructor(
     readonly id: string,
@@ -12,6 +14,13 @@ export class Expedition {
     readonly travelFrom: string,
     readonly travelTo: string,
   ) {}
+
+  public getDateBounds(includeTravel: boolean): { from: Date, to: Date } {
+    return {
+      from: convertISOToDate(includeTravel ? this.travelFrom : this.from, this.timezone),
+      to: convertISOToDate(includeTravel ? this.travelTo : this.to, this.timezone),
+    };
+  }
 }
 
 export const expeditionConverter = {
