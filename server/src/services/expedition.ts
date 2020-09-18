@@ -3,7 +3,7 @@ import { Timestamp } from '@google-cloud/firestore';
 import FirestoreProvider from '../FirestoreProvider';
 import { Expedition } from '../models/Expedition';
 import { LocationHistory, locationHistoryConverter } from '../models/LocationHistory';
-import convertISOToDate from '../utils';
+import { convertISOToDate } from '../utils';
 
 export class DateOutOfBounds extends Error {
   constructor() {
@@ -32,7 +32,7 @@ export const getLatestPoint = async (expedition: Expedition): Promise<LocationHi
 
 export const getAllPoints = async (
   expedition: Expedition,
-  date: string,
+  date?: string,
 ): Promise<LocationHistory[]> => {
   const { firestore } = FirestoreProvider.get();
   const { from, to } = expedition.getDateBounds(false);

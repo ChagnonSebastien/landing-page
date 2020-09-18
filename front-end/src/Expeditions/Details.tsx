@@ -98,17 +98,15 @@ const ExpeditionDetails = withRouter((props: Props)  => {
     axios.all([
       server.get(`/expeditions/${expeditionId}`),
       server.get(`/expeditions/${expeditionId}/locationHistory/latest`),
-      server.get(`/expeditions/${expeditionId}/locationHistory`),
     ])
       .then(axios.spread((
         expeditionResponse,
         latestLocationResponse,
-        locationHistoryResponse,
       ) => {
-        setExpedition(expeditionResponse.data);
+        console.log(expeditionResponse.data);
+        setExpedition(expeditionResponse.data.expedition);
         setLatestLocation(latestLocationResponse.data);
-
-        setLocationHistory(locationHistoryResponse.status === 204 ? [] : locationHistoryResponse.data);
+        setLocationHistory(expeditionResponse.data.locationHistory);
       }))
       .catch((error: any) => console.error(error));
   }, [expeditionId]);

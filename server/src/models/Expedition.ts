@@ -1,6 +1,6 @@
 import { DocumentData, QueryDocumentSnapshot } from '@google-cloud/firestore';
 
-import convertISOToDate from '../utils';
+import { convertISOToDate } from '../utils';
 
 export class Expedition {
   constructor(

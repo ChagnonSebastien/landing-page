@@ -40,7 +40,10 @@ router.use('/:expeditionId', async (req: Request, res: Response, next: NextFunct
 
 router.get('/:expeditionId', async (req, res) => {
   try {
-    return res.send(res.locals.expedition);
+    // eslint-disable-next-line prefer-destructuring
+    const expedition: Expedition = res.locals.expedition;
+    const locationHistory = await expeditionService.getAllPoints(expedition);
+    return res.send({ expedition, locationHistory });
   } catch (error) {
     console.error(error);
     return res.status(500).send(error);
