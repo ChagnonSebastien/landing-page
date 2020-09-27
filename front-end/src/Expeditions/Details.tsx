@@ -10,7 +10,6 @@ import { getZonedTime, findTimeZone, getUnixTime } from 'timezone-support';
 import Expedition from './Expedition';
 import SpotPing, { distanceBetweenGeoPoints } from './SpotPing';
 import server from '../server';
-import axios from 'axios';
 import Vector2D from './Vector2D';
 
 const mapsContainerStyle = {
@@ -18,21 +17,23 @@ const mapsContainerStyle = {
   height: '30rem',
 };
 
-const isValidDate = (before: Date, direction: number, expedition: Expedition, latest: SpotPing) => {
-  const after = new Date(before);
-  after.setDate(before.getDate() + direction);
+interface ExpeditionData {
+  expedition: Expedition
+  lastPoint: SpotPing
+  firstPoint: SpotPing
+  locationHistory: SpotPing[]
+}
 
-  const from = new Date(expedition.from);
-  const to = new Date(expedition.to);
-  if (from.getTime() > after.getTime() || to.getTime() < after.getTime()) {
-    return false
-  }
-
+const isValidDate = (before: Date, direction: number, expeditionData: ExpeditionData) => {
   const actualTime = { year: before.getUTCFullYear(), month: before.getUTCMonth() + 1, day: before.getUTCDate(), hours: 0, minutes: 0 };
-  const actualDate = new Date(getUnixTime(actualTime, findTimeZone(expedition.timezone)));
+  const actualDate = new Date(getUnixTime(actualTime, findTimeZone(expeditionData.expedition.timezone)));
   const nextActualDate = new Date(actualDate);
   nextActualDate.setDate(actualDate.getDate() + direction)
-  if (nextActualDate.getTime() > latest.timestamp) {
+  if (nextActualDate.getTime() > expeditionData.lastPoint.timestamp) {
+    return false;
+  }
+  
+  if (nextActualDate.getTime() < expeditionData.firstPoint.timestamp - 86_400_000) {
     return false;
   }
 
@@ -52,11 +53,10 @@ const ExpeditionDetails = withRouter((props: Props)  => {
   const { params } = match;
   const { expeditionId } = params;
 
-  const [expedition, setExpedition] = useState<Expedition>();
-  const [latestLocation, setLatestLocation] = useState<SpotPing>();
-
-  const [dateFilter, setDateFilter] = useState<Date>();
+  const [expeditionData, setExpeditionData] = useState<ExpeditionData>();
   const [locationHistory, setLocationHistory] = useState<SpotPing[]>();
+
+  const [dateFilter, setDateFilter] = useState<Date>(); // UTC Date
 
   const [map, setMap] = useState<google.maps.Map>();
   const [selectedPoint, setSelectedPoint] = useState<number>();
@@ -76,38 +76,48 @@ const ExpeditionDetails = withRouter((props: Props)  => {
     return profile;
   }, [locationHistory]);
 
+  const firstPointDate = useMemo(() => {
+    if (!expeditionData) return undefined;
+    const zonedTime = getZonedTime(new Date(expeditionData?.firstPoint.timestamp), findTimeZone(expeditionData.expedition.timezone))
+    return new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')} ${String(zonedTime.hours).padStart(2, '0')}:${String(zonedTime.minutes).padStart(2, '0')}:${String(zonedTime.seconds).padStart(2, '0')}`);
+  }, [expeditionData]);
+
+  const lastPointDate = useMemo(() => {
+    if (!expeditionData) return undefined;
+    const zonedTime = getZonedTime(new Date(expeditionData.firstPoint.timestamp), findTimeZone(expeditionData.expedition.timezone))
+    return new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')} ${String(zonedTime.hours).padStart(2, '0')}:${String(zonedTime.minutes).padStart(2, '0')}:${String(zonedTime.seconds).padStart(2, '0')}`);
+  }, [expeditionData]);
+
   useEffect(() => {
     if (!window.google) return;
     const bounds: google.maps.LatLngBounds = new google.maps.LatLngBounds();
-    locationHistory?.forEach((point) => bounds.extend(new google.maps.LatLng(point.location.latitude, point.location.longitude)));
+    if (locationHistory) {
+      locationHistory.forEach((point) => bounds.extend(new google.maps.LatLng(point.location.latitude, point.location.longitude)));
+    } else if (expeditionData) {
+      expeditionData?.locationHistory.forEach((point) => bounds.extend(new google.maps.LatLng(point.location.latitude, point.location.longitude)));
+      bounds.extend(new google.maps.LatLng(expeditionData.firstPoint.location.latitude, expeditionData.firstPoint.location.longitude));
+      bounds.extend(new google.maps.LatLng(expeditionData.lastPoint.location.latitude, expeditionData.lastPoint.location.longitude));
+    }
     map?.fitBounds(bounds);
-  }, [map, locationHistory]);
+  }, [map, locationHistory, expeditionData]);
 
   useEffect(() => {
-    const dateQuery = dateFilter
-      ? `?date=${dateFilter?.getUTCFullYear()}-${String(dateFilter?.getUTCMonth() + 1).padStart(2, '0')}-${String(dateFilter?.getUTCDate()).padStart(2, '0')}`
-      : '';
-    server.get(`/expeditions/${expeditionId}/locationHistory${dateQuery}`)
+    setLocationHistory(undefined);
+    if (dateFilter) {
+      const dateQuery = `?date=${dateFilter?.getUTCFullYear()}-${String(dateFilter?.getUTCMonth() + 1).padStart(2, '0')}-${String(dateFilter?.getUTCDate()).padStart(2, '0')}`;
+      server.get(`/expeditions/${expeditionId}/locationHistory${dateQuery}`)
       .then((response) => {
         setLocationHistory(response.status === 204 ? [] : response.data);
       })
       .catch((error) => console.error(error));
+    }
   }, [dateFilter, expeditionId]);
 
   useEffect(() => {
-    axios.all([
-      server.get(`/expeditions/${expeditionId}`),
-      server.get(`/expeditions/${expeditionId}/locationHistory/latest`),
-    ])
-      .then(axios.spread((
-        expeditionResponse,
-        latestLocationResponse,
-      ) => {
-        console.log(expeditionResponse.data);
-        setExpedition(expeditionResponse.data.expedition);
-        setLatestLocation(latestLocationResponse.data);
-        setLocationHistory(expeditionResponse.data.locationHistory);
-      }))
+    server.get(`/expeditions/${expeditionId}`)
+      .then((expeditionResponse) => {
+        setExpeditionData(expeditionResponse.data);
+      })
       .catch((error: any) => console.error(error));
   }, [expeditionId]);
 
@@ -124,18 +134,18 @@ const ExpeditionDetails = withRouter((props: Props)  => {
             >
               <MDBRow>
                 <MDBCol lg="6" style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
-                  <h1>{expedition?.name}</h1>
+                  <h1>{expeditionData?.expedition.name}</h1>
                 </MDBCol>
                 <MDBCol lg="6" style={{ textAlign: 'center', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
                   {dateFilter
                     ? (
-                      expedition && latestLocation
+                      expeditionData
                         ? (
                           <>
                             <MDBBtn
                               style={{ flexShrink: '0' }}
                               floating
-                              disabled={!isValidDate(dateFilter, -1, expedition, latestLocation)}
+                              disabled={!isValidDate(dateFilter, -1, expeditionData)}
                               onClick={() => {
                                 const newDate = new Date(dateFilter);
                                 newDate.setDate(dateFilter.getDate() - 1);
@@ -146,8 +156,8 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                             </MDBBtn>
                             <DatePicker
                               format="yyyy-MM-dd"
-                              minDate={new Date((new Date(expedition.from)).toUTCString().split(' ').slice(0, 4).join(' '))}
-                              maxDate={new Date((new Date(expedition.to)).toUTCString().split(' ').slice(0, 4).join(' '))}
+                              minDate={new Date((new Date(expeditionData.expedition.from)).toUTCString().split(' ').slice(0, 4).join(' '))}
+                              maxDate={new Date((new Date(new Date(expeditionData.expedition.to).getTime() - 86_400_000)).toUTCString().split(' ').slice(0, 4).join(' '))}
                               value={new Date(dateFilter.toUTCString().split(' ').slice(0, 4).join(' '))}
                               onChange={newDate => {
                                 if (!newDate) {
@@ -160,7 +170,7 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                             <MDBBtn
                               style={{ flexShrink: '0' }}
                               floating
-                              disabled={!isValidDate(dateFilter, 1, expedition, latestLocation)}
+                              disabled={!isValidDate(dateFilter, 1, expeditionData)}
                               onClick={() => {
                                 const newDate = new Date(dateFilter);
                                 newDate.setDate(dateFilter.getDate() + 1);
@@ -173,11 +183,11 @@ const ExpeditionDetails = withRouter((props: Props)  => {
                         )
                         : null
                     ) : (
-                      latestLocation && expedition
+                      expeditionData
                         ? (
                           <MDBBtn
                             onClick={() => {
-                              const zonedTime = getZonedTime(new Date(latestLocation.timestamp), findTimeZone(expedition.timezone))
+                              const zonedTime = getZonedTime(new Date(expeditionData.lastPoint.timestamp), findTimeZone(expeditionData.expedition.timezone))
                               const newFilter = new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')}`);
                               setDateFilter(newFilter);
                             }}
@@ -192,31 +202,95 @@ const ExpeditionDetails = withRouter((props: Props)  => {
             <MDBCardBody cascade className='text-center'>
               <MDBRow>
                 <MDBCol>
-                  {expedition
+                  {expeditionData
                     ? (
                       <GoogleMap
                         mapContainerStyle={mapsContainerStyle}
                         onLoad={mapLoaded}
                       >
-                        {locationHistory?.map((point: SpotPing, index: number) => {
-                          const zonedTime = getZonedTime(new Date(point.timestamp), findTimeZone(expedition.timezone))
-                          const markerDate = new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')} ${String(zonedTime.hours).padStart(2, '0')}:${String(zonedTime.minutes).padStart(2, '0')}:${String(zonedTime.seconds).padStart(2, '0')}`);
-                          return (
+                        {
+                          locationHistory?.filter((point: SpotPing) => (
+                            expeditionData?.locationHistory.find((p: SpotPing) => p.timestamp === point.timestamp) === undefined ||
+                            point.timestamp !== expeditionData.firstPoint.timestamp ||
+                            point.timestamp !== expeditionData.lastPoint.timestamp
+                          )).map((point: SpotPing, index: number, history: SpotPing[]) => {
+                            const zonedTime = getZonedTime(new Date(point.timestamp), findTimeZone(expeditionData.expedition.timezone))
+                            const markerDate = new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')} ${String(zonedTime.hours).padStart(2, '0')}:${String(zonedTime.minutes).padStart(2, '0')}:${String(zonedTime.seconds).padStart(2, '0')}`);
+                            return (
+                              <Marker
+                                key={point.timestamp}
+                                position={{lat: point.location.latitude, lng: point.location.longitude}}
+                                icon={'http://icongal.com/gallery/download/446879/24/png'}
+                                onClick={() => setSelectedPoint(point.timestamp)}
+                                zIndex={1}
+                              >
+                                {point.timestamp === selectedPoint
+                                  ? (
+                                    <InfoWindow onCloseClick={() => setSelectedPoint(undefined)}>
+                                      <p>{markerDate.toString().split(' ').slice(0, 5).join(' ')}</p>
+                                    </InfoWindow>
+                                  ) : null}
+                              </Marker>
+                            );
+                          })
+                        }
+                        {
+                          expeditionData.firstPoint.timestamp !== expeditionData.lastPoint.timestamp ? (
                             <Marker
-                              key={point.timestamp}
-                              position={{lat: point.location.latitude, lng: point.location.longitude}}
-                              icon={index === locationHistory.length - 1 ? 'http://icongal.com/gallery/download/447373/32/png' : 'http://icongal.com/gallery/download/446879/24/png'}
-                              onClick={() => setSelectedPoint(point.timestamp)}
+                              key={expeditionData.firstPoint.timestamp}
+                              position={{lat: expeditionData.firstPoint.location.latitude, lng: expeditionData.firstPoint.location.longitude}}
+                              icon={'http://icongal.com/gallery/download/446879/24/png'}
+                              onClick={() => setSelectedPoint(expeditionData.firstPoint.timestamp)}
+                              zIndex={2}
                             >
-                              {point.timestamp === selectedPoint
+                              {expeditionData.firstPoint.timestamp === selectedPoint
                                 ? (
                                   <InfoWindow onCloseClick={() => setSelectedPoint(undefined)}>
-                                    <p>{markerDate.toString().split(' ').slice(0, 5).join(' ')}</p>
+                                    <p>{firstPointDate?.toString().split(' ').slice(0, 5).join(' ')}</p>
                                   </InfoWindow>
                                 ) : null}
                             </Marker>
-                          );
-                        })}
+                          ) : null
+                        }
+                        {
+                          expeditionData?.locationHistory.filter((point: SpotPing) => (
+                            point.timestamp !== expeditionData.firstPoint.timestamp ||
+                            point.timestamp !== expeditionData.lastPoint.timestamp
+                          )).map((point: SpotPing) => {
+                            const zonedTime = getZonedTime(new Date(point.timestamp), findTimeZone(expeditionData.expedition.timezone))
+                            const markerDate = new Date(`${zonedTime.year}-${String(zonedTime.month).padStart(2, '0')}-${String(zonedTime.day).padStart(2, '0')} ${String(zonedTime.hours).padStart(2, '0')}:${String(zonedTime.minutes).padStart(2, '0')}:${String(zonedTime.seconds).padStart(2, '0')}`);
+                            return (
+                              <Marker
+                                key={point.timestamp}
+                                position={{lat: point.location.latitude, lng: point.location.longitude}}
+                                icon={'http://icongal.com/gallery/download/447076/32/png'}
+                                onClick={() => setSelectedPoint(point.timestamp)}
+                                zIndex={3}
+                              >
+                                {point.timestamp === selectedPoint
+                                  ? (
+                                    <InfoWindow onCloseClick={() => setSelectedPoint(undefined)}>
+                                      <p>{markerDate.toString().split(' ').slice(0, 5).join(' ')}</p>
+                                    </InfoWindow>
+                                  ) : null}
+                              </Marker>
+                            );
+                          })
+                        }
+                        <Marker
+                          key={expeditionData.lastPoint.timestamp}
+                          position={{lat: expeditionData.lastPoint.location.latitude, lng: expeditionData.lastPoint.location.longitude}}
+                          icon={'http://icongal.com/gallery/download/447373/32/png'}
+                          onClick={() => setSelectedPoint(expeditionData.lastPoint.timestamp)}
+                          zIndex={4}
+                        >
+                          {expeditionData.lastPoint.timestamp === selectedPoint
+                            ? (
+                              <InfoWindow onCloseClick={() => setSelectedPoint(undefined)}>
+                                <p>{lastPointDate?.toString().split(' ').slice(0, 5).join(' ')}</p>
+                              </InfoWindow>
+                            ) : null}
+                        </Marker>
                       </GoogleMap>
                   ) : null}
                 </MDBCol>
