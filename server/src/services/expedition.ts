@@ -11,9 +11,28 @@ export class DateOutOfBounds extends Error {
   }
 }
 
+export const getFirstPoint = async (expedition: Expedition): Promise<LocationHistory> => {
+  const { firestore } = FirestoreProvider.get();
+  const { from, to } = expedition.getDateBounds(false);
+
+  const searchQuery = firestore.collection('locationHistory')
+    .withConverter(locationHistoryConverter)
+    .orderBy('timestamp', 'asc')
+    .limit(1)
+    .where('timestamp', '>', Timestamp.fromDate(from))
+    .where('timestamp', '<', Timestamp.fromDate(to));
+
+  const locationQuery = await searchQuery.get();
+  if (locationQuery.empty) {
+    return undefined;
+  }
+
+  return locationQuery.docs[0].data();
+};
+
 export const getLatestPoint = async (expedition: Expedition): Promise<LocationHistory> => {
   const { firestore } = FirestoreProvider.get();
-  const { from, to } = expedition.getDateBounds(true);
+  const { from, to } = expedition.getDateBounds(false);
 
   const searchQuery = firestore.collection('locationHistory')
     .withConverter(locationHistoryConverter)

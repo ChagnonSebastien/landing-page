@@ -12,7 +12,7 @@ export class LocationHistory {
       longitude: number,
     },
     readonly messageType: string,
-    readonly timestamp: Date,
+    readonly timestamp: number,
   ) {}
 }
 
@@ -23,7 +23,7 @@ export const locationHistoryConverter = {
       elevation: location.elevation,
       location: new GeoPoint(location.location.latitude, location.location.longitude),
       messageType: location.messageType,
-      timestamp: Timestamp.fromDate(location.timestamp),
+      timestamp: Timestamp.fromMillis(location.timestamp),
     };
   },
   fromFirestore(snapshot: QueryDocumentSnapshot): LocationHistory {
@@ -36,7 +36,7 @@ export const locationHistoryConverter = {
       data.elevation,
       { latitude: location.latitude, longitude: location.longitude },
       data.messageType,
-      timestamp.toDate(),
+      timestamp.toMillis(),
     );
   },
 };

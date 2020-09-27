@@ -42,8 +42,20 @@ router.get('/:expeditionId', async (req, res) => {
   try {
     // eslint-disable-next-line prefer-destructuring
     const expedition: Expedition = res.locals.expedition;
-    const locationHistory = await expeditionService.getAllPoints(expedition);
-    return res.send({ expedition, locationHistory });
+    const locationHistoryPromise = expeditionService.getAllPoints(expedition);
+    const firstPointPromise = expeditionService.getFirstPoint(expedition);
+    const lastPointPromise = expeditionService.getLatestPoint(expedition);
+    const [
+      locationHistory,
+      firstPoint,
+      lastPoint,
+    ] = await Promise.all([locationHistoryPromise, firstPointPromise, lastPointPromise]);
+    return res.send({
+      expedition,
+      locationHistory,
+      firstPoint,
+      lastPoint,
+    });
   } catch (error) {
     console.error(error);
     return res.status(500).send(error);
@@ -71,23 +83,6 @@ router.get('/:expeditionId/locationHistory', [
     }
 
     return res.status(500).send(error);
-  }
-});
-
-router.get('/:expeditionId/locationHistory/latest', async (req, res) => {
-  try {
-    // eslint-disable-next-line prefer-destructuring
-    const expedition: Expedition = res.locals.expedition;
-    const point = await expeditionService.getLatestPoint(expedition);
-
-    if (point === undefined) {
-      return res.status(404).send('No location has ever been recorded for this expedition.');
-    }
-
-    return res.send(point);
-  } catch (error) {
-    console.error(error);
-    return res.status(500).send(error.message);
   }
 });
 
