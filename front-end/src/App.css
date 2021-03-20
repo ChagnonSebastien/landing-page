@@ -1,0 +1,11 @@
+@font-face {
+  font-family: 'League Spartan';
+  src: url(/LeagueSpartan-Bold.otf);
+}
+
+
+html, 
+body,
+#root {
+  height: 100%;
+}

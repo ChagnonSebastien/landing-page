@@ -4,32 +4,33 @@ import { BrowserRouter as Router, Switch, Route, Link } from 'react-router-dom';
 import ExpeditionsList from './Expeditions';
 import ExpeditionDetails from './Expeditions/Details';
 import { MDBContainer } from 'mdbreact';
-import Navigation from './Navigation';
+import './App.css';
+import Home from './Home';
+import World from './World/World_1';
 
 const App = ()  => (
   <Router>
-    <div className="fixed-sn light-blue-skin">
-      <Navigation>
+    <Switch>
+      <Route exact path="/">
+        <Home />
+      </Route>
+      <Route exact path="/expeditions">
         <MDBContainer size="xl">
-          <Switch>
-            <Route exact path="/">
-              <h1>Home</h1>
-            </Route>
-            <Route exact path="/expeditions">
-              <ExpeditionsList />
-            </Route>
-            <Route path="/expeditions/:expeditionId">
-              <ExpeditionDetails />
-            </Route>
-            <Route>
-              <h2>How did you get here?</h2>
-              <p>This page doesn't seem to exist</p>
-              <Link to="/">Return to Home</Link>
-            </Route>
-          </Switch>
+          <ExpeditionsList />
         </MDBContainer>
-      </Navigation>
-    </div>
+      </Route>
+      <Route path="/expeditions/:expeditionId">
+        <ExpeditionDetails />
+      </Route>
+      <Route path="/world">
+        <World />
+      </Route>
+      <Route>
+        <h2>How did you get here?</h2>
+        <p>This page doesn't seem to exist</p>
+        <Link to="/">Return to Home</Link>
+      </Route>
+    </Switch>
   </Router>
 );
 

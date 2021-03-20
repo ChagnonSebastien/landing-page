@@ -11,6 +11,7 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   console.log(`[${new Date().toISOString()}] ${req.method}:${req.url}`);
   next();
 });
+app.get('/', (_, res) => res.send('coucou ^^'));
 
 app.get('/version', (_, res) => res.send('v1.0.0'));
 
