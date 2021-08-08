@@ -1,7 +1,26 @@
-import axios, { AxiosResponse } from "axios";
+import axios from "axios";
 import { firestore } from 'firebase-admin';
 import { Client, ElevationResponse } from "@googlemaps/google-maps-services-js";
 import { config } from 'firebase-functions';
+
+type SpotResponse = {
+  response: {
+    feedMessageResponse: {
+      count: number,
+      messages: {
+        message: Array<{
+          latitude: number,
+          longitude: number,
+          unixTime: number,
+          messageType: string,
+          messageContent: string,
+          batteryState: string,
+        }>,
+      },
+    },
+    errors: Array<{}>,
+  },
+}
 
 export default async () => {
   const client = new Client({});
@@ -9,7 +28,8 @@ export default async () => {
   const feedID = '0cabP8hB9XxqSSJ9QGNd160ahvZoVCeD3';
   let offset = 0;
   while (true) {
-    const response: AxiosResponse = await axios.get(`https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/${feedID}/message.json?start=${offset}`)
+    const url = `https://api.findmespot.com/spot-main-web/consumer/rest-api/2.0/public/feed/${feedID}/message.json?start=${offset}`;
+    const response = await axios.get<SpotResponse>(url)
     if (response.data.response.errors) {
       console.log('Reached the end of the feed. Stopping.');
       return;
@@ -18,6 +38,7 @@ export default async () => {
 
     while (messages.length > 0) {
       const message = messages.shift();
+      if (!message) throw new Error('No more items in the queue');
 
       const query = await FirestoreInstance.collection('locationHistory').where('timestamp', '==', firestore.Timestamp.fromMillis(message.unixTime * 1000)).limit(1).get();
       if(!query.empty) {

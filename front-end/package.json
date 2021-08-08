@@ -13,6 +13,7 @@
     "@types/react-router-dom": "^5.1.5",
     "axios": "^0.21.1",
     "chart.js": "^2.9.3",
+    "firebase": "^8.6.1",
     "mdbreact": "git+https://git.mdbootstrap.com/mdb/react/re-pro.git",
     "react": "^16.13.1",
     "react-chartjs-2": "^2.9.0",
